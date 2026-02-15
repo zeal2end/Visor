@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Terminal, Keyboard, Shield, Zap, Clock, Globe, Github, Download, ChevronRight } from 'lucide-react';
+import { Terminal, Keyboard, Shield, Zap, Clock, Globe, Github } from 'lucide-react';
 
 const FeatureCard = ({ icon: Icon, title, description }: { icon: any, title: string, description: string }) => (
   <motion.div 
@@ -88,7 +88,7 @@ function App() {
           <div className="p-8 text-left font-mono space-y-4 min-h-[300px]">
             <div className="flex items-center gap-3 text-[#b8bb26]">
               <span className="text-[#a89984] opacity-50">1</span>
-              <span>> inbox</span>
+              <span>{">"} inbox</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-[#a89984] opacity-50">2</span>
