@@ -42,6 +42,21 @@ export function BrowseHints() {
                 { keys: 'h', label: '\u2190' },
             ];
             break;
+        case 'detail':
+            hints = [
+                { keys: 'e', label: 'edit' },
+                { keys: 'n', label: 'notes' },
+                { keys: 'Space', label: '\u25CE' },
+                { keys: 'Shift+\u21B5', label: 'subtask' },
+                { keys: 'h', label: '\u2190' },
+            ];
+            break;
+        case 'project-settings':
+            hints = [
+                { keys: '>', label: 'cmd' },
+                { keys: 'h', label: '\u2190' },
+            ];
+            break;
         default:
             hints = [
                 { keys: 'h', label: '\u2190 back' },

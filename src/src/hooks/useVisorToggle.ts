@@ -31,9 +31,16 @@ export function useVisorToggle() {
             show();
         });
 
+        // Auto-hide when window loses focus
+        const handleBlur = () => {
+            hide();
+        };
+        window.addEventListener('blur', handleBlur);
+
         return () => {
             unlistenHide.then(fn => fn());
             unlistenShow.then(fn => fn());
+            window.removeEventListener('blur', handleBlur);
         };
     }, [hide, show]);
 

@@ -83,6 +83,24 @@ export function useKeyboard() {
 
             case 'l':
             case 'Enter': {
+                // Shift+Enter: add subtask
+                if (e.shiftKey) {
+                    if (view.type === 'detail') {
+                        e.preventDefault();
+                        const parentTaskId = (view as any).taskId;
+                        const parentTask = tasks[parentTaskId];
+                        if (parentTask) {
+                            pushView({ type: 'thread', projectId: parentTask.projectId, parentTaskId });
+                            setTimeout(() => showInput('task'), 50);
+                        }
+                    } else if (selectedItem?.type === 'task') {
+                        e.preventDefault();
+                        const task = selectedItem.data;
+                        pushView({ type: 'thread', projectId: task.projectId, parentTaskId: task.id });
+                        setTimeout(() => showInput('task'), 50);
+                    }
+                    break;
+                }
                 e.preventDefault();
                 if (!selectedItem) break;
 
@@ -102,24 +120,8 @@ export function useKeyboard() {
                     } else if (view.type === 'agenda' || view.type === 'search') {
                         navigateToTask(task.id);
                     } else {
-                        // Edit the task
-                        let input = task.content;
-                        if (task.dueAt) {
-                            const due = new Date(task.dueAt);
-                            const now = new Date();
-                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                            const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-                            const diffDays = Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-                            if (diffDays === 0) input += ' !today';
-                            else if (diffDays === 1) input += ' !tomorrow';
-                            else {
-                                const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-                                if (diffDays > 0 && diffDays <= 7) input += ` !${days[due.getDay()]}`;
-                                else input += ` !${due.getMonth() + 1}/${due.getDate()}`;
-                            }
-                        }
-                        useStore.setState({ editingTaskId: task.id, nextIndentLevel: task.indent });
-                        showInput('edit', input);
+                        // Open detail view for leaf tasks
+                        pushView({ type: 'detail', taskId: task.id });
                     }
                 } else if (selectedItem.type === 'template') {
                     useStore.getState().applyTemplate(selectedItem.data.id);
@@ -129,8 +131,20 @@ export function useKeyboard() {
 
             case ' ':
                 e.preventDefault();
-                if (selectedItem?.type === 'task') {
+                if (view.type === 'detail') {
+                    cycleTaskStatus((view as any).taskId);
+                } else if (selectedItem?.type === 'task') {
                     cycleTaskStatus(selectedItem.data.id);
+                }
+                break;
+
+            case 'n':
+                if (view.type === 'detail') {
+                    e.preventDefault();
+                    const detailTaskId = (view as any).taskId;
+                    const detailTask = tasks[detailTaskId];
+                    useStore.setState({ editingTaskId: detailTaskId });
+                    showInput('notes', detailTask?.notes || '');
                 }
                 break;
 
@@ -145,7 +159,30 @@ export function useKeyboard() {
 
             case 'e':
                 e.preventDefault();
-                if (selectedItem?.type === 'task') {
+                if (view.type === 'detail') {
+                    const dtask = tasks[(view as any).taskId];
+                    if (dtask) {
+                        let input = dtask.content;
+                        if (dtask.dueAt) {
+                            const due = new Date(dtask.dueAt);
+                            const now = new Date();
+                            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                            const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+                            const diffDays = Math.round((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            if (diffDays === 0) input += ' !today';
+                            else if (diffDays === 1) input += ' !tomorrow';
+                            else {
+                                const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                                if (diffDays > 0 && diffDays <= 7) input += ` !${days[due.getDay()]}`;
+                                else input += ` !${due.getMonth() + 1}/${due.getDate()}`;
+                            }
+                        }
+                        useStore.setState({ editingTaskId: dtask.id, nextIndentLevel: dtask.indent });
+                        showInput('edit', input);
+                    }
+                } else if (selectedItem?.type === 'project') {
+                    pushView({ type: 'project-settings', projectId: selectedItem.data.id });
+                } else if (selectedItem?.type === 'task') {
                     const task = selectedItem.data;
                     let input = task.content;
                     if (task.dueAt) {

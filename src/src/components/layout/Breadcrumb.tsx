@@ -61,6 +61,15 @@ export function Breadcrumb() {
             case 'search':
                 segments.push({ label: `"${view.query}"`, onClick: () => useStore.setState({ viewStack: viewStack.slice(0, targetLength), selectedItemIndex: 0, lastNavDirection: 'pop' }) });
                 break;
+            case 'detail': {
+                const detailTask = tasks[view.taskId];
+                const detailLabel = detailTask ? (detailTask.content.length > 20 ? detailTask.content.slice(0, 20) + '\u2026' : detailTask.content) : '?';
+                segments.push({ label: detailLabel, onClick: () => useStore.setState({ viewStack: viewStack.slice(0, targetLength), selectedItemIndex: 0, lastNavDirection: 'pop' }) });
+                break;
+            }
+            case 'project-settings':
+                segments.push({ label: 'settings', onClick: () => useStore.setState({ viewStack: viewStack.slice(0, targetLength), selectedItemIndex: 0, lastNavDirection: 'pop' }) });
+                break;
         }
     }
 

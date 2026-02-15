@@ -18,7 +18,8 @@ import {
     INBOX_PROJECT
 } from './types';
 import { CommandDef, filterCommands } from '../lib/commands';
-import { parseDueDate } from '../lib/parser';
+import { parseDueDate, computeNextOccurrence } from '../lib/parser';
+import { fuzzySearchTasks } from '../lib/search';
 
 interface VisorStore {
     // Data
@@ -115,6 +116,8 @@ interface VisorStore {
 
     // --- Project ---
     deleteProject: (projectSlug: string) => void;
+    renameProject: (slug: string, newName: string) => void;
+    setProjectColor: (slug: string, color: string) => void;
     getProjectList: () => Project[];
     getProjectStats: () => { project: Project; total: number; pending: number; completed: number; progress: number }[];
 
@@ -269,7 +272,16 @@ export const useStore = create<VisorStore>((set, get) => ({
                 return items;
             }
             case 'project': {
-                const tasks = get().getProjectTasks(view.projectId, null);
+                const getFlattened = (pid: string | null): Task[] => {
+                    const children = state.getProjectTasks(view.projectId, pid);
+                    let res: Task[] = [];
+                    for (const child of children) {
+                        res.push(child);
+                        res = [...res, ...getFlattened(child.id)];
+                    }
+                    return res;
+                };
+                const tasks = getFlattened(null);
                 return tasks.map(t => ({ type: 'task' as const, data: t }));
             }
             case 'thread': {
@@ -280,13 +292,14 @@ export const useStore = create<VisorStore>((set, get) => ({
                 return state.templates.map(t => ({ type: 'template' as const, data: t }));
             }
             case 'search': {
-                const q = view.query.toLowerCase();
-                const results = Object.values(state.tasks)
-                    .filter(t => !t.archived && t.content.toLowerCase().includes(q))
-                    .sort((a, b) => b.createdAt - a.createdAt)
-                    .slice(0, 30);
+                const activeTasks = Object.values(state.tasks).filter(t => !t.archived);
+                const results = fuzzySearchTasks(activeTasks, view.query).slice(0, 30);
                 return results.map(t => ({ type: 'task' as const, data: t }));
             }
+            case 'detail':
+                return [];
+            case 'project-settings':
+                return [];
             default:
                 return [];
         }
@@ -322,7 +335,7 @@ export const useStore = create<VisorStore>((set, get) => ({
         }
 
         const id = uuidv4();
-        const { content: cleanContent, dueAt, scheduled } = parseDueDate(content);
+        const { content: cleanContent, dueAt, scheduled, recurrence } = parseDueDate(content);
         const indent = state.nextIndentLevel;
 
         // Find parent based on view context
@@ -357,6 +370,7 @@ export const useStore = create<VisorStore>((set, get) => ({
             dueAt,
             scheduled,
             notes: null,
+            recurrence,
         };
 
         set(s => {
@@ -402,9 +416,10 @@ export const useStore = create<VisorStore>((set, get) => ({
         };
     }),
 
-    cycleTaskStatus: (taskId) => set(state => {
+    cycleTaskStatus: (taskId) => {
+        const state = get();
         const task = state.tasks[taskId];
-        if (!task) return state;
+        if (!task) return;
 
         const previousStatus = task.status || 'TODO';
         const currentIndex = TASK_STATUS_ORDER.indexOf(previousStatus);
@@ -413,7 +428,7 @@ export const useStore = create<VisorStore>((set, get) => ({
         const isCompleted = newStatus === 'DONE';
         const isCancelled = newStatus === 'CANCELLED';
 
-        return {
+        const updates: any = {
             tasks: {
                 ...state.tasks,
                 [taskId]: {
@@ -426,7 +441,49 @@ export const useStore = create<VisorStore>((set, get) => ({
             undoStack: [...state.undoStack.slice(-19), { type: 'STATUS_CHANGE', taskId, previousStatus }],
             redoStack: [],
         };
-    }),
+
+        // Recurring task: when completing, auto-create next instance
+        if (isCompleted && task.recurrence) {
+            const nextDueAt = computeNextOccurrence(task.recurrence);
+            const newId = uuidv4();
+            const nextTask: Task = {
+                id: newId,
+                content: task.content,
+                completed: false,
+                status: 'TODO',
+                archived: false,
+                projectId: task.projectId,
+                parentId: task.parentId,
+                indent: task.indent,
+                createdAt: Date.now(),
+                completedAt: null,
+                dueAt: nextDueAt,
+                scheduled: null,
+                notes: null,
+                recurrence: task.recurrence,
+            };
+            updates.tasks[newId] = nextTask;
+
+            const project = state.projects[task.projectId];
+            if (project) {
+                updates.projects = {
+                    ...state.projects,
+                    [task.projectId]: {
+                        ...project,
+                        taskOrder: [...project.taskOrder, newId],
+                    },
+                };
+            }
+
+            const nextDate = new Date(nextDueAt);
+            const dateLabel = nextDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            set(updates);
+            get().showToast(`Recurring: next on ${dateLabel}`);
+            return;
+        }
+
+        set(updates);
+    },
 
     archiveTask: (taskId) => set(state => {
         const task = state.tasks[taskId];
@@ -659,6 +716,20 @@ export const useStore = create<VisorStore>((set, get) => ({
             case 'settings':
                 set({ settingsOpen: true });
                 break;
+            case 'rename': {
+                const slug = args[0];
+                const newName = args.slice(1).join(' ');
+                if (slug && newName) get().renameProject(slug, newName);
+                else get().showToast('Usage: rename <slug> <new name>');
+                break;
+            }
+            case 'color': {
+                const slug = args[0];
+                const color = args[1];
+                if (slug && color) get().setProjectColor(slug, color);
+                else get().showToast('Usage: color <slug> #hex');
+                break;
+            }
             case 'delete':
             case 'rm': {
                 const slug = args[0];
@@ -759,6 +830,34 @@ export const useStore = create<VisorStore>((set, get) => ({
             selectedItemIndex: 0,
         });
         get().showToast(`Deleted project "${project.name}"`);
+    },
+
+    renameProject: (slug, newName) => {
+        const state = get();
+        const project = Object.values(state.projects).find(p => p.slug === slug);
+        if (!project) { get().showToast(`Project "${slug}" not found`); return; }
+        if (project.isInbox) { get().showToast('Cannot rename Inbox'); return; }
+        const newSlug = newName.toLowerCase().replace(/\s+/g, '-');
+        set(s => ({
+            projects: {
+                ...s.projects,
+                [project.id]: { ...project, name: newName, slug: newSlug },
+            },
+        }));
+        get().showToast(`Renamed to "${newName}"`);
+    },
+
+    setProjectColor: (slug, color) => {
+        const state = get();
+        const project = Object.values(state.projects).find(p => p.slug === slug);
+        if (!project) { get().showToast(`Project "${slug}" not found`); return; }
+        set(s => ({
+            projects: {
+                ...s.projects,
+                [project.id]: { ...project, color },
+            },
+        }));
+        get().showToast(`Color updated for "${project.name}"`);
     },
 
     getProjectList: () => {

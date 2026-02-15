@@ -14,6 +14,8 @@ export const COMMAND_REGISTRY: CommandDef[] = [
     { name: 'templates', description: 'Manage task templates', category: 'view' },
     { name: 'template save', description: 'Save current tasks as template', category: 'action' },
     { name: 'template apply', description: 'Apply a template', category: 'action' },
+    { name: 'rename', description: 'Rename a project (> rename slug New Name)', category: 'action' },
+    { name: 'color', description: 'Set project color (> color slug #hex)', category: 'action' },
     { name: 'delete', description: 'Delete a project (> delete slug)', aliases: ['rm'], category: 'action' },
     { name: 'journal', description: 'View journal entries', aliases: ['log'], category: 'view' },
     { name: 'settings', description: 'Open settings panel', category: 'system' },

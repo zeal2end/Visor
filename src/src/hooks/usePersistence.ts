@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useStore } from '../store';
 import { Settings, DEFAULT_SETTINGS, ViewEntry, Template } from '../store/types';
 
@@ -18,6 +19,7 @@ interface PersistedData {
 export function usePersistence() {
     const hasLoaded = useRef(false);
     const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastExternalUpdate = useRef(0);
 
     // Load data on mount
     useEffect(() => {
@@ -47,6 +49,7 @@ export function usePersistence() {
                             ...t,
                             status: t.status || (t.completed ? 'DONE' : 'TODO'),
                             scheduled: t.scheduled ?? null,
+                            recurrence: t.recurrence ?? null,
                         };
                     }
 
@@ -55,9 +58,11 @@ export function usePersistence() {
                     if (data.viewStack && Array.isArray(data.viewStack) && data.viewStack.length > 0) {
                         // V2 data -- use as-is, but validate entries
                         viewStack = data.viewStack.filter(v => {
-                            if (v.type === 'project' && !cleanProjects[v.projectId]) return false;
-                            if (v.type === 'thread' && !cleanProjects[v.projectId]) return false;
-                            if (v.type === 'journal' && !cleanProjects[v.projectId]) return false;
+                            if (v.type === 'project' && !cleanProjects[(v as any).projectId]) return false;
+                            if (v.type === 'thread' && !cleanProjects[(v as any).projectId]) return false;
+                            if (v.type === 'journal' && !cleanProjects[(v as any).projectId]) return false;
+                            if (v.type === 'project-settings' && !cleanProjects[(v as any).projectId]) return false;
+                            if (v.type === 'detail' && !migratedTasks[(v as any).taskId]) return false;
                             return true;
                         });
                         if (viewStack.length === 0) viewStack = [{ type: 'home' }];
@@ -91,10 +96,53 @@ export function usePersistence() {
         load();
     }, []);
 
+    // Listen for external data changes (from HTTP API server)
+    useEffect(() => {
+        let unlisten: (() => void) | null = null;
+        (async () => {
+            unlisten = await listen('data-changed', async () => {
+                lastExternalUpdate.current = Date.now();
+                try {
+                    const raw = await invoke<string>('load_data');
+                    if (raw && raw !== 'null') {
+                        const data: PersistedData = JSON.parse(raw);
+                        const store = useStore.getState();
+
+                        // Migrate tasks
+                        const migratedTasks: Record<string, any> = {};
+                        for (const [id, task] of Object.entries(data.tasks || {})) {
+                            const t = task as any;
+                            migratedTasks[id] = {
+                                ...t,
+                                status: t.status || (t.completed ? 'DONE' : 'TODO'),
+                                scheduled: t.scheduled ?? null,
+                                recurrence: t.recurrence ?? null,
+                            };
+                        }
+
+                        // Only update data, not UI state (viewStack, selectedItemIndex, etc.)
+                        useStore.setState({
+                            tasks: migratedTasks,
+                            projects: data.projects || store.projects,
+                            logEntries: data.logEntries || store.logEntries,
+                            templates: data.templates || store.templates,
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to reload data after external change:', e);
+                }
+            });
+        })();
+        return () => { unlisten?.(); };
+    }, []);
+
     // Save on changes (debounced 500ms)
     useEffect(() => {
         const unsub = useStore.subscribe((state, prev) => {
             if (!hasLoaded.current) return;
+
+            // Skip save if we just loaded from external update (prevents write-back race)
+            if (Date.now() - lastExternalUpdate.current < 1000) return;
 
             // Only save when persistable data changed
             if (
@@ -108,6 +156,9 @@ export function usePersistence() {
 
             if (saveTimer.current) clearTimeout(saveTimer.current);
             saveTimer.current = setTimeout(() => {
+                // Re-check to prevent race
+                if (Date.now() - lastExternalUpdate.current < 1000) return;
+
                 const s = useStore.getState();
                 const data: PersistedData = {
                     tasks: s.tasks,

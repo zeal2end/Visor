@@ -2,6 +2,7 @@ import { useStore } from '../../store';
 import { ViewEntry, Task, Project, TASK_STATUS_CONFIG } from '../../store/types';
 import { TaskItem } from '../tasks/TaskItem';
 import { Kbd } from '../common/Kbd';
+import { fuzzySearchTasks } from '../../lib/search';
 
 // --- Date helpers ---
 
@@ -34,6 +35,8 @@ export function ViewRenderer({ view }: { view: ViewEntry }) {
         case 'journal': return <JournalView projectId={view.projectId} />;
         case 'help': return <HelpView />;
         case 'search': return <SearchView query={view.query} />;
+        case 'detail': return <DetailView taskId={view.taskId} />;
+        case 'project-settings': return <ProjectSettingsView projectId={view.projectId} />;
     }
 }
 
@@ -423,11 +426,8 @@ function HelpView() {
 function SearchView({ query }: { query: string }) {
     const { tasks, projects, selectedItemIndex, cycleTaskStatus } = useStore();
 
-    const q = query.toLowerCase();
-    const results = Object.values(tasks)
-        .filter(t => !t.archived && t.content.toLowerCase().includes(q))
-        .sort((a, b) => b.createdAt - a.createdAt)
-        .slice(0, 30);
+    const activeTasks = Object.values(tasks).filter(t => !t.archived);
+    const results = fuzzySearchTasks(activeTasks, query).slice(0, 30);
 
     return (
         <div className="search-view">
@@ -447,6 +447,128 @@ function SearchView({ query }: { query: string }) {
                     ))}
                 </div>
             )}
+        </div>
+    );
+}
+
+// --- Project Settings View ---
+
+function ProjectSettingsView({ projectId }: { projectId: string }) {
+    const { projects } = useStore();
+    const project = projects[projectId];
+
+    if (!project) return <div className="view-empty">Project not found</div>;
+
+    return (
+        <div className="project-settings-view">
+            <h3 className="project-settings-title">Project Settings</h3>
+            <div className="detail-field">
+                <span className="detail-label">Name</span>
+                <span className="detail-value">{project.name}</span>
+            </div>
+            <div className="detail-field">
+                <span className="detail-label">Slug</span>
+                <span className="detail-value">{project.slug}</span>
+            </div>
+            <div className="detail-field">
+                <span className="detail-label">Color</span>
+                <span className="detail-value">
+                    <span className="home-project-dot" style={{ background: project.color, display: 'inline-block', verticalAlign: 'middle', marginRight: 6 }} />
+                    {project.color}
+                </span>
+            </div>
+            <div className="detail-field">
+                <span className="detail-label">Created</span>
+                <span className="detail-value">{new Date(project.createdAt).toLocaleDateString()}</span>
+            </div>
+            <div className="detail-hints">
+                <p><code>&gt; rename {project.slug} New Name</code> — rename project</p>
+                <p><code>&gt; color {project.slug} #hex</code> — change color</p>
+                {!project.isInbox && <p><code>&gt; delete {project.slug}</code> — delete project</p>}
+            </div>
+        </div>
+    );
+}
+
+// --- Detail View ---
+
+function DetailView({ taskId }: { taskId: string }) {
+    const { tasks, projects } = useStore();
+    const task = tasks[taskId];
+
+    if (!task) return <div className="view-empty">Task not found</div>;
+
+    const project = projects[task.projectId];
+    const status = TASK_STATUS_CONFIG[task.status || 'TODO'];
+
+    const formatDate = (ts: number) => {
+        const d = new Date(ts);
+        return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+
+    const recurrenceLabel = task.recurrence ? (
+        task.recurrence.type === 'daily' ? 'Every day' :
+        task.recurrence.type === 'weekdays' ? 'Every weekday' :
+        task.recurrence.type === 'monthly' ? 'Every month' :
+        task.recurrence.type === 'weekly' && task.recurrence.dayOfWeek !== undefined
+            ? `Every ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][task.recurrence.dayOfWeek]}`
+            : 'Every week'
+    ) : null;
+
+    return (
+        <div className="detail-view">
+            <div className="detail-header">
+                <span className="detail-status" style={{ color: status.color }}>{status.icon}</span>
+                <span className="detail-content">{task.content}</span>
+            </div>
+            <div className="detail-meta">
+                <div className="detail-field">
+                    <span className="detail-label">Status</span>
+                    <span className="detail-value" style={{ color: status.color }}>{status.label}</span>
+                </div>
+                {project && (
+                    <div className="detail-field">
+                        <span className="detail-label">Project</span>
+                        <span className="detail-value">
+                            <span className="home-project-dot" style={{ background: project.color, display: 'inline-block', verticalAlign: 'middle', marginRight: 6 }} />
+                            {project.name}
+                        </span>
+                    </div>
+                )}
+                <div className="detail-field">
+                    <span className="detail-label">Created</span>
+                    <span className="detail-value">{formatDate(task.createdAt)}</span>
+                </div>
+                {task.dueAt && (
+                    <div className="detail-field">
+                        <span className="detail-label">Due</span>
+                        <span className="detail-value">{formatDate(task.dueAt)}</span>
+                    </div>
+                )}
+                {task.scheduled && (
+                    <div className="detail-field">
+                        <span className="detail-label">Scheduled</span>
+                        <span className="detail-value">{formatDate(task.scheduled)}</span>
+                    </div>
+                )}
+                {recurrenceLabel && (
+                    <div className="detail-field">
+                        <span className="detail-label">Repeats</span>
+                        <span className="detail-value">{recurrenceLabel}</span>
+                    </div>
+                )}
+            </div>
+            <div className="detail-notes-section">
+                <span className="detail-label">Notes</span>
+                {task.notes ? (
+                    <p className="detail-notes">{task.notes}</p>
+                ) : (
+                    <p className="detail-notes-empty">No notes. Press <Kbd keys="n" size="sm" /> to add.</p>
+                )}
+            </div>
+            <div className="detail-hints">
+                <p><Kbd keys="e" size="sm" /> edit &nbsp; <Kbd keys="n" size="sm" /> notes &nbsp; <Kbd keys="Space" size="sm" /> status &nbsp; <Kbd keys="Shift+Enter" size="sm" /> subtask &nbsp; <Kbd keys="h" size="sm" /> back</p>
+            </div>
         </div>
     );
 }

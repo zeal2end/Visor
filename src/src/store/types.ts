@@ -19,6 +19,11 @@ export const TASK_STATUS_CONFIG: Record<TaskStatus, { label: string; icon: strin
     WAITING: { label: 'WAITING', icon: '\u25CC', color: 'var(--yellow)' },
 };
 
+export interface Recurrence {
+    type: 'daily' | 'weekly' | 'monthly' | 'weekdays';
+    dayOfWeek?: number; // 0=Sun..6=Sat for weekly
+}
+
 export interface Task {
     id: string;
     content: string;
@@ -33,6 +38,7 @@ export interface Task {
     dueAt: number | null;
     scheduled: number | null;
     notes: string | null;
+    recurrence: Recurrence | null;
 }
 
 export interface Project {
@@ -54,10 +60,12 @@ export type ViewEntry =
     | { type: 'templates' }
     | { type: 'journal'; projectId: string }
     | { type: 'help' }
-    | { type: 'search'; query: string };
+    | { type: 'search'; query: string }
+    | { type: 'detail'; taskId: string }
+    | { type: 'project-settings'; projectId: string };
 
 // V2 Input overlay purpose
-export type InputPurpose = 'task' | 'command' | 'search' | 'journal' | 'edit';
+export type InputPurpose = 'task' | 'command' | 'search' | 'journal' | 'edit' | 'notes';
 
 // V2 Template
 export interface Template {

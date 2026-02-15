@@ -45,29 +45,48 @@ export function TaskItem({ task, isSelected, onComplete, hasChildren, childCount
     return (
         <div
             ref={ref}
-            className={`task-item ${isSelected ? 'selected' : ''} ${isDone ? 'completed' : ''} task-status-${status.toLowerCase()}`}
+            className={`task-item ${isSelected ? 'selected' : ''} ${isDone ? 'completed' : ''} task-status-${status.toLowerCase()} ${task.notes ? 'has-notes' : ''} ${task.parentId ? 'is-subtask' : ''}`}
             onClick={onComplete}
         >
+            {task.indent > 0 && Array.from({ length: task.indent }).map((_, i) => (
+                <div key={i} className="task-indent-spacer">
+                    {i === task.indent - 1 ? (
+                        <div className="task-thread-elbow" />
+                    ) : (
+                        <div className="task-thread-line" />
+                    )}
+                </div>
+            ))}
             <span className="task-status-icon" style={{ color: statusConfig.color }} title={statusConfig.label}>
                 {statusConfig.icon}
             </span>
-            <span className="task-content">{task.content}</span>
-            {hasChildren && (
-                <span className="task-children-indicator">{'\u25B8'} {childCount}</span>
-            )}
-            {status === 'DOING' && <span className="task-status-badge doing">DOING</span>}
-            {status === 'WAITING' && <span className="task-status-badge waiting">WAIT</span>}
-            {scheduledInfo && !isDone && (
-                <span className="task-scheduled">{'\u25B8'} {scheduledInfo.label}</span>
-            )}
-            {dueInfo && !isDone && (
-                <span className={`task-due ${dueInfo.isOverdue ? 'overdue' : ''} ${dueInfo.isToday ? 'due-today' : ''}`}>
-                    {'\u25C6'} {dueInfo.label}
-                </span>
-            )}
-            {projectSlug && (
-                <span className="task-project-slug">{projectSlug}</span>
-            )}
+            <div className="task-main">
+                <div className="task-content-row">
+                    <span className="task-content">{task.content}</span>
+                    {task.recurrence && (
+                        <span className="task-recurrence-icon" title="Recurring">{'\u21BB'}</span>
+                    )}
+                    {hasChildren && (
+                        <span className="task-children-indicator">{'\u25B8'} {childCount}</span>
+                    )}
+                    {status === 'DOING' && <span className="task-status-badge doing">DOING</span>}
+                    {status === 'WAITING' && <span className="task-status-badge waiting">WAIT</span>}
+                    {scheduledInfo && !isDone && (
+                        <span className="task-scheduled">{'\u25B8'} {scheduledInfo.label}</span>
+                    )}
+                    {dueInfo && !isDone && (
+                        <span className={`task-due ${dueInfo.isOverdue ? 'overdue' : ''} ${dueInfo.isToday ? 'due-today' : ''}`}>
+                            {'\u25C6'} {dueInfo.label}
+                        </span>
+                    )}
+                    {projectSlug && (
+                        <span className="task-project-slug">{projectSlug}</span>
+                    )}
+                </div>
+                {task.notes && (
+                    <div className="task-notes-preview">{task.notes}</div>
+                )}
+            </div>
         </div>
     );
 }

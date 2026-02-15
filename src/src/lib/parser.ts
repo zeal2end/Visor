@@ -1,4 +1,4 @@
-import { InputMode } from '../store/types';
+import { InputMode, Recurrence } from '../store/types';
 
 /**
  * Parses input string into structured InputMode
@@ -129,10 +129,32 @@ export function getPlaceholder(): string {
  *   @today, @tomorrow, @mon-@sun, @1/20  — SCHEDULED (start working on)
  * Returns { content (cleaned), dueAt, scheduled }
  */
-export function parseDueDate(content: string): { content: string; dueAt: number | null; scheduled: number | null } {
+export function parseDueDate(content: string): { content: string; dueAt: number | null; scheduled: number | null; recurrence: Recurrence | null } {
     let dueAt: number | null = null;
     let scheduled: number | null = null;
+    let recurrence: Recurrence | null = null;
     let cleaned = content;
+
+    // Parse recurrence (!every <pattern>) — must be checked before deadline
+    const recurrenceMatch = cleaned.match(/\s*!every\s+(day|weekday|week|month|mon|tue|wed|thu|fri|sat|sun)\s*/i);
+    if (recurrenceMatch) {
+        const pattern = recurrenceMatch[1].toLowerCase();
+        cleaned = cleaned.replace(recurrenceMatch[0], ' ').trim();
+
+        if (pattern === 'day') {
+            recurrence = { type: 'daily' };
+        } else if (pattern === 'weekday') {
+            recurrence = { type: 'weekdays' };
+        } else if (pattern === 'week') {
+            recurrence = { type: 'weekly' };
+        } else if (pattern === 'month') {
+            recurrence = { type: 'monthly' };
+        } else {
+            const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+            const dayOfWeek = days.indexOf(pattern);
+            recurrence = { type: 'weekly', dayOfWeek };
+        }
+    }
 
     // Parse deadline (!token)
     const deadlineMatch = cleaned.match(/\s*!(today|tomorrow|tom|mon|tue|wed|thu|fri|sat|sun|\d{1,2}\/\d{1,2})\s*/i);
@@ -148,7 +170,45 @@ export function parseDueDate(content: string): { content: string; dueAt: number 
         cleaned = cleaned.replace(scheduledMatch[0], ' ').trim();
     }
 
-    return { content: cleaned, dueAt, scheduled };
+    // If recurrence set but no explicit dueAt, auto-compute first occurrence
+    if (recurrence && !dueAt) {
+        dueAt = computeNextOccurrence(recurrence);
+    }
+
+    return { content: cleaned, dueAt, scheduled, recurrence };
+}
+
+export function computeNextOccurrence(recurrence: Recurrence): number {
+    const now = new Date();
+    const target = new Date(now);
+    const setEndOfDay = (d: Date) => { d.setHours(23, 59, 59, 0); return d; };
+
+    switch (recurrence.type) {
+        case 'daily':
+            target.setDate(target.getDate() + 1);
+            return setEndOfDay(target).getTime();
+        case 'weekdays': {
+            target.setDate(target.getDate() + 1);
+            while (target.getDay() === 0 || target.getDay() === 6) {
+                target.setDate(target.getDate() + 1);
+            }
+            return setEndOfDay(target).getTime();
+        }
+        case 'weekly': {
+            if (recurrence.dayOfWeek !== undefined) {
+                const currentDay = now.getDay();
+                let diff = recurrence.dayOfWeek - currentDay;
+                if (diff <= 0) diff += 7;
+                target.setDate(target.getDate() + diff);
+            } else {
+                target.setDate(target.getDate() + 7);
+            }
+            return setEndOfDay(target).getTime();
+        }
+        case 'monthly':
+            target.setMonth(target.getMonth() + 1);
+            return setEndOfDay(target).getTime();
+    }
 }
 
 function resolveDate(token: string): number {

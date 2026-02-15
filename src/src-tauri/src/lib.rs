@@ -1,3 +1,5 @@
+mod api_server;
+
 use std::fs;
 use std::path::PathBuf;
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, Position, Size};
@@ -105,6 +107,7 @@ fn activate_window(window: &tauri::WebviewWindow) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![load_data, save_data])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
@@ -116,6 +119,8 @@ pub fn run() {
                 position_on_active_monitor(&window);
                 activate_window(&window);
             }
+
+            api_server::start_api_server(app.handle().clone());
 
             #[cfg(desktop)]
             {

@@ -10,6 +10,7 @@ interface SuggestItem {
 
 export function InputOverlay() {
     const inputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const {
         inputPurpose,
         inputValue,
@@ -69,8 +70,12 @@ export function InputOverlay() {
 
     // Auto-focus on mount
     useEffect(() => {
-        inputRef.current?.focus();
-    }, []);
+        if (inputPurpose === 'notes') {
+            textareaRef.current?.focus();
+        } else {
+            inputRef.current?.focus();
+        }
+    }, [inputPurpose]);
 
     // Auto-clear toast
     useEffect(() => {
@@ -79,22 +84,32 @@ export function InputOverlay() {
         return () => clearTimeout(timer);
     }, [toast, clearToast]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const value = e.target.value;
         setInputValue(value);
-        const parsed = parseInput(value);
-        setInputMode(parsed);
 
-        if (parsed.type === 'COMMAND') {
-            updateSuggestions(parsed.command);
-        } else {
-            closeSuggestions();
+        if (inputPurpose !== 'notes') {
+            const parsed = parseInput(value);
+            setInputMode(parsed);
+
+            if (parsed.type === 'COMMAND') {
+                updateSuggestions(parsed.command);
+            } else {
+                closeSuggestions();
+            }
         }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!inputValue.trim()) return;
+
+        // Notes mode
+        if (inputPurpose === 'notes' && editingTaskId) {
+            updateTask(editingTaskId, { notes: inputValue.trim() || null });
+            hideInput();
+            return;
+        }
 
         // Edit mode
         if (editingTaskId) {
@@ -136,6 +151,20 @@ export function InputOverlay() {
         inputRef.current?.focus();
     };
 
+    const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            hideInput();
+            return;
+        }
+        // Cmd/Ctrl+Enter to submit notes
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            handleSubmit(e as unknown as React.FormEvent);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Escape') {
             e.preventDefault();
@@ -169,17 +198,21 @@ export function InputOverlay() {
     };
 
     const purposeClass = `input-overlay-${inputPurpose}`;
-    const ghostText = editingTaskId
-        ? '\u21B5 save'
-        : inputPurpose === 'task'
-            ? (nextIndentLevel > 0 ? '\u21B5 add subtask' : '\u21B5 add task')
-            : inputPurpose === 'command'
-                ? '\u21B5 run'
-                : inputPurpose === 'search'
-                    ? '\u21B5 search'
-                    : inputPurpose === 'journal'
-                        ? '\u21B5 log'
-                        : '\u21B5 save';
+    const isNotesMode = inputPurpose === 'notes';
+
+    const ghostText = isNotesMode
+        ? '\u2318\u21B5 save notes'
+        : editingTaskId
+            ? '\u21B5 save'
+            : inputPurpose === 'task'
+                ? (nextIndentLevel > 0 ? '\u21B5 add subtask' : '\u21B5 add task')
+                : inputPurpose === 'command'
+                    ? '\u21B5 run'
+                    : inputPurpose === 'search'
+                        ? '\u21B5 search'
+                        : inputPurpose === 'journal'
+                            ? '\u21B5 log'
+                            : '\u21B5 save';
 
     return (
         <div className={`input-overlay ${purposeClass}`}>
@@ -201,22 +234,35 @@ export function InputOverlay() {
 
             <form onSubmit={handleSubmit} className="input-overlay-form">
                 <div className="input-overlay-wrapper">
-                    {nextIndentLevel > 0 && (
+                    {nextIndentLevel > 0 && !isNotesMode && (
                         <span className="input-indent-indicator">
                             {'\u203A'.repeat(nextIndentLevel)}
                         </span>
                     )}
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={inputValue}
-                        onChange={handleChange}
-                        onKeyDown={handleKeyDown}
-                        placeholder={editingTaskId ? 'Edit task...' : 'Type here...'}
-                        className="input-overlay-field"
-                        style={nextIndentLevel > 0 ? { paddingLeft: `${12 + nextIndentLevel * 16}px` } : undefined}
-                        autoFocus
-                    />
+                    {isNotesMode ? (
+                        <textarea
+                            ref={textareaRef}
+                            value={inputValue}
+                            onChange={handleChange}
+                            onKeyDown={handleTextareaKeyDown}
+                            placeholder="Add notes... (Cmd+Enter to save)"
+                            className="input-overlay-field input-overlay-textarea"
+                            rows={4}
+                            autoFocus
+                        />
+                    ) : (
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={inputValue}
+                            onChange={handleChange}
+                            onKeyDown={handleKeyDown}
+                            placeholder={editingTaskId ? 'Edit task...' : 'Type here...'}
+                            className="input-overlay-field"
+                            style={nextIndentLevel > 0 ? { paddingLeft: `${12 + nextIndentLevel * 16}px` } : undefined}
+                            autoFocus
+                        />
+                    )}
                     {inputValue.trim() && (
                         <span className="input-ghost">{ghostText}</span>
                     )}
