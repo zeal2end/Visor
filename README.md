@@ -1,5 +1,7 @@
 # Visor V2 (Quake Visor)
 
+[![Documentation](https://img.shields.io/badge/docs-live-brightgreen)](https://zeal2end.github.io/Visor/)
+
 A keyboard-centric, Quake-style task manager for macOS (and other desktops) built with Tauri, React, and Rust. It stays hidden until you summon it with a global shortcut (`Ctrl + ~`), allowing you to quickly capture tasks, manage projects, and run focus sessions without breaking your flow.
 
 ## ✨ Features
