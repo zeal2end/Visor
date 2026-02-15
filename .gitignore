@@ -53,3 +53,7 @@ ehthumbs.db
 tmp/
 temp/
 *.tmp
+
+# Project Internal
+internal/
+.gemini/
