@@ -7,41 +7,41 @@
 ## Phase 1: Core Shell (MVP)
 
 ### Project Setup
-- [ ] Initialize Tauri v2 project with React + TypeScript
-- [ ] Configure Vite for Tauri
-- [ ] Set up Tailwind CSS with Gruvbox theme
+- [x] Initialize Tauri v2 project with React + TypeScript
+- [x] Configure Vite for Tauri
+- [x] Set up Tailwind CSS with Gruvbox theme
 - [ ] Configure ESLint + Prettier
-- [ ] Set up Zustand store structure
+- [x] Set up Zustand store structure
 
 ### Window Management
-- [ ] Create frameless, transparent window
-- [ ] Implement always-on-top behavior
-- [ ] Register global hotkey (`Ctrl+~`)
-- [ ] Implement show/hide with slide animation
+- [x] Create frameless, transparent window
+- [x] Implement always-on-top behavior
+- [x] Register global hotkey (`Ctrl+~`)
+- [x] Implement show/hide with slide animation
 - [ ] Handle multi-monitor positioning
 
 ### Layout & Components
-- [ ] Build `WindowContainer` with three-zone grid
-- [ ] Build `ZoneA` (Stream) component
-- [ ] Build `ZoneB` (Reference) component
-- [ ] Build `OmniInput` component with mode indicator
-- [ ] Build `ModeIndicator` label component
+- [x] Build `WindowContainer` with three-zone grid
+- [x] Build `ZoneA` (Stream) component
+- [x] Build `ZoneB` (Reference) component
+- [x] Build `OmniInput` component with mode indicator
+- [x] Build `ModeIndicator` label component
 - [ ] Implement ghost text placeholder
 
 ### Task Management
-- [ ] Define Task data model
-- [ ] Implement task creation from input
-- [ ] Implement task completion toggle
-- [ ] Implement task archiving
-- [ ] Build `TaskList` component
-- [ ] Build `TaskItem` component
-- [ ] Persist tasks to `~/.visor/data.json`
+- [x] Define Task data model
+- [x] Implement task creation from input
+- [x] Implement task completion toggle
+- [x] Implement task archiving
+- [x] Build `TaskList` component
+- [x] Build `TaskItem` component
+- [x] Persist tasks to `~/.visor/data.json`
 
 ### Parser
-- [ ] Implement prefix tokenizer
-- [ ] Route to task/command/search/log handlers
-- [ ] Real-time mode detection as user types
-- [ ] Handle edge cases (no space after prefix, empty input)
+- [x] Implement prefix tokenizer
+- [x] Route to task/command/search/log handlers
+- [x] Real-time mode detection as user types
+- [x] Handle edge cases (no space after prefix, empty input)
 
 ---
 
@@ -187,4 +187,4 @@
 
 ---
 
-*Last Updated: 2026-02-02*
+*Last Updated: 2026-02-13*

@@ -83,13 +83,23 @@ Instead of opening heavy apps (Notion, Obsidian, Todoist):
 
 ## Current Status
 
-- **Stage:** Design Complete, Pre-Implementation
+- **Stage:** Phase 1 — Core Shell (in progress)
 - **Documentation:**
   - `MASTER_PLAN.md` — UX and interaction design (the "what")
   - `TECHNICAL_DESIGN.md` — Architecture and implementation spec (the "how")
   - `_archive/` — Earlier ideation documents
-- **Code:** Not started
-- **Blockers:** None — ready to build
+- **Code:** Scaffold complete, global hotkey wired, slide animation, persistence
+- **Branch:** `agent/phase1-core-shell`
+- **What works:**
+  - Tauri v2 frameless/transparent/always-on-top window
+  - Global hotkey (`Ctrl+`\``) toggles show/hide via Rust backend
+  - Slide-down/slide-up animation on toggle
+  - Three-zone layout (Stream, Reference, OmniInput)
+  - OmniInput with real-time mode parsing (TASK/CMD/SEARCH/LOG)
+  - Zustand store with task CRUD, context stack, undo/redo
+  - Vim-style keyboard navigation (hjkl, Space, x, u, ESC)
+  - Persistence to `~/.visor/data.json`
+- **What's next:** Test full flow with `npm run tauri dev`, polish OmniInput ghost text, command execution
 
 ---
 
@@ -188,5 +198,5 @@ npm run tauri build
 
 ---
 
-**Last Updated:** 2026-02-02
-**Stage:** Design Complete — Ready for Phase 1 Implementation
+**Last Updated:** 2026-02-13
+**Stage:** Phase 1 Core Shell — In Progress
