@@ -2,7 +2,7 @@
 name = "visor"
 version = "0.1.0"
 description = "Quake-style drop-down overlay for daily productivity"
-authors = ["drost"]
+authors = ["Quake Visor Team"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
